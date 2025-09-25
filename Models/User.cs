@@ -1,7 +1,11 @@
-namespace ChatAPI.Models;
+using SignalRWebpack.Hubs;
+using SignalRWebpack.Models;
+
+namespace SignalRWebpack.Models;
 
 public class User
 {
-    public int Id { get; set; }
+    public required string Id { get; set; }
     public string? Name { get; set; }
+    public AuthState authState { get; set; }
 }

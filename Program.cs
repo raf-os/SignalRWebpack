@@ -1,7 +1,12 @@
+using Microsoft.AspNetCore.SignalR;
 using SignalRWebpack.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddSignalR();
+builder.Services.AddSignalR()
+    .AddHubOptions<ChatHub>(opt =>
+    {
+        opt.AddFilter<AuthStateFilter>();
+    });
 
 builder.Services.AddCors(options =>
 {

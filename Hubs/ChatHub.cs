@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.AspNetCore.SignalR;
+using SignalRWebpack.Models;
 
 namespace SignalRWebpack.Hubs;
 
@@ -19,24 +20,28 @@ public class AuthStateAttribute : Attribute
 
 public class ChatHub : Hub<IChatClient>
 {
-    private static readonly ConcurrentDictionary<string, AuthState> States = new();
+    private static readonly List<User> States = [];
 
     public static AuthState GetState(string connectionId)
     {
-        return States.TryGetValue(connectionId, out var state)
-            ? state
-            : AuthState.Guest;
+        User? query = States.Find(s => s.Id == connectionId);
+        return (query == null) ? AuthState.Guest : query.authState;
     }
 
     public override Task OnConnectedAsync()
     {
-        States[Context.ConnectionId] = AuthState.Guest;
+        User newUser = new() { Id = Context.ConnectionId };
+        States.Add(newUser);
         return base.OnConnectedAsync();
     }
 
     public override Task OnDisconnectedAsync(Exception? exception)
     {
-        States.TryRemove(Context.ConnectionId, out _);
+        if (Context.ConnectionId != null)
+        {
+            User? query = States.Find(s => s.Id == Context.ConnectionId);
+            if (query != null) { States.Remove(query); }
+        }
         return base.OnDisconnectedAsync(exception);
     }
 
@@ -48,7 +53,22 @@ public class ChatHub : Hub<IChatClient>
 
     public async Task Register(string username)
     {
-        States[Context.ConnectionId] = AuthState.User;
+        User? guestUser = States.Find(s => s.Id == Context.ConnectionId);
+
+        if (guestUser == null)
+        {
+            throw new HubException("Error: No user ID!");
+        }
+
+        bool isInvalid = States.Exists(s => s.Name == username);
+
+        if (isInvalid)
+        {
+            await Clients.Caller.ReceiveMessage("sys", "Username already exists.", "server");
+            return;
+        }
+
+        guestUser.Name = username;
         await Clients.Caller.Register(username);
     }
 }

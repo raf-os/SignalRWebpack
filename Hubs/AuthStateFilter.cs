@@ -14,7 +14,7 @@ public class AuthStateFilter : IHubFilter
             var state = ChatHub.GetState(context.Context.ConnectionId);
             if (state != authFilter.Required)
             {
-                throw new HubException("You're not authenticated for this method.");
+                throw new HubException("You're not authorized for this action.");
             }
         }
 
