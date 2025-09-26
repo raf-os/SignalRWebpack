@@ -1,5 +1,4 @@
 using SignalRWebpack.Hubs;
-using SignalRWebpack.Models;
 
 namespace SignalRWebpack.Models;
 

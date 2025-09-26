@@ -28,10 +28,23 @@ public class ChatHub : Hub<IChatClient>
         return (query == null) ? AuthState.Guest : query.authState;
     }
 
+    private static List<User> GetLoggedUsers()
+    {
+        var loggedUsers = States.FindAll(s => s.authState == AuthState.User);
+        return loggedUsers;
+    }
+
+    private Task PushClientListUpdate()
+    {
+        var loggedUsers = GetLoggedUsers();
+        return Clients.All.UpdateClientList(loggedUsers);
+    }
+
     public override Task OnConnectedAsync()
     {
         User newUser = new() { Id = Context.ConnectionId };
         States.Add(newUser);
+        PushClientListUpdate();
         return base.OnConnectedAsync();
     }
 
@@ -41,6 +54,7 @@ public class ChatHub : Hub<IChatClient>
         {
             User? query = States.Find(s => s.Id == Context.ConnectionId);
             if (query != null) { States.Remove(query); }
+            PushClientListUpdate();
         }
         return base.OnDisconnectedAsync(exception);
     }
@@ -70,5 +84,11 @@ public class ChatHub : Hub<IChatClient>
 
         guestUser.Name = username;
         await Clients.Caller.Register(username);
+    }
+
+    public async Task FetchUsers()
+    {
+        var loggedUsers = GetLoggedUsers();
+        await Clients.Caller.UpdateClientList(loggedUsers);
     }
 }
