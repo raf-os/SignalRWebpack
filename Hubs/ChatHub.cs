@@ -1,6 +1,9 @@
-using System.Collections.Concurrent;
 using Microsoft.AspNetCore.SignalR;
 using SignalRWebpack.Models;
+using SignalRWebpack.Database;
+using Microsoft.EntityFrameworkCore;
+using SignalRWebpack.Services;
+using SignalRWebpack.Hubs.Responses;
 
 namespace SignalRWebpack.Hubs;
 
@@ -18,9 +21,16 @@ public class AuthStateAttribute : Attribute
         Required = required;
 }
 
-public class ChatHub : Hub<IChatClient>
+public class RegisterRequestObject
+{
+    public required string Username { get; set; }
+    public required string Password { get; set; }
+}
+
+public class ChatHub(IAuthService authService) : Hub<IChatClient>
 {
     private static readonly List<User> States = [];
+    private readonly IAuthService _authService = authService;
 
     public static AuthState GetState(string connectionId)
     {
@@ -40,23 +50,23 @@ public class ChatHub : Hub<IChatClient>
         return Clients.All.UpdateClientList(loggedUsers);
     }
 
-    public override Task OnConnectedAsync()
+    public override async Task OnConnectedAsync()
     {
         User newUser = new() { Id = Context.ConnectionId };
         States.Add(newUser);
-        PushClientListUpdate();
-        return base.OnConnectedAsync();
+        await PushClientListUpdate();
+        await base.OnConnectedAsync();
     }
 
-    public override Task OnDisconnectedAsync(Exception? exception)
+    public override async Task OnDisconnectedAsync(Exception? exception)
     {
         if (Context.ConnectionId != null)
         {
             User? query = States.Find(s => s.Id == Context.ConnectionId);
             if (query != null) { States.Remove(query); }
-            PushClientListUpdate();
+            await PushClientListUpdate();
         }
-        return base.OnDisconnectedAsync(exception);
+        await base.OnDisconnectedAsync(exception);
     }
 
     [AuthState(AuthState.User)]
@@ -65,7 +75,7 @@ public class ChatHub : Hub<IChatClient>
         await Clients.All.ReceiveMessage(username, message, type);
     }
 
-    public async Task Register(string username)
+    public async Task LogIn(string username)
     {
         User? guestUser = States.Find(s => s.Id == Context.ConnectionId);
 
@@ -84,8 +94,31 @@ public class ChatHub : Hub<IChatClient>
 
         guestUser.Name = username;
         guestUser.authState = AuthState.User;
-        await Clients.Caller.Register(username);
+        await Clients.Caller.LogIn(username);
         await FetchUsers();
+    }
+
+    public async Task<StandardJsonResponse> Register(RegisterRequestObject registerRequest)
+    {
+        using var context = new ApplicationDbContext();
+        var lookupUsername = await context.Users.Where(u => u.Name == registerRequest.Username).ToListAsync();
+        if (lookupUsername.Count != 0)
+        {
+            return new StandardJsonResponse { Success = false, Message = "Username already exists." };
+        }
+
+        var saltedPassword = _authService.SaltAndHash(registerRequest.Password);
+
+        if (saltedPassword == null)
+        {
+            return new StandardJsonResponse { Success = false, Message = "Error encrypting password. Please choose a different one." };
+        }
+
+        context.Users.Add(new DbUser { Name = registerRequest.Username, Password = saltedPassword });
+
+        await context.SaveChangesAsync();
+
+        return new StandardJsonResponse { Success = true, Message = "User registered successfully!" };
     }
 
     public async Task FetchUsers()

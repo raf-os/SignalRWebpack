@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.SignalR;
 using SignalRWebpack.Hubs;
+using SignalRWebpack.Database;
+using SignalRWebpack.Services;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSignalR()
@@ -18,6 +21,12 @@ builder.Services.AddCors(options =>
             .AllowCredentials();
     });
 });
+
+builder.Services.AddDbContext<ApplicationDbContext>(
+    options => options.UseSqlite("Data Source=users.db")
+);
+
+builder.Services.AddScoped<IAuthService, AuthService>();
 
 var app = builder.Build();
 
