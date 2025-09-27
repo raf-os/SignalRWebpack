@@ -83,7 +83,9 @@ public class ChatHub : Hub<IChatClient>
         }
 
         guestUser.Name = username;
+        guestUser.authState = AuthState.User;
         await Clients.Caller.Register(username);
+        await FetchUsers();
     }
 
     public async Task FetchUsers()
