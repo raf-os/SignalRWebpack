@@ -75,27 +75,73 @@ public class ChatHub(IAuthService authService) : Hub<IChatClient>
         await Clients.All.ReceiveMessage(username, message, type);
     }
 
-    public async Task LogIn(string username)
+    public async Task<StandardJsonResponse> LogIn(string username, string password)
     {
-        User? guestUser = States.Find(s => s.Id == Context.ConnectionId);
+        using var context = new ApplicationDbContext();
+        DbUser? user = await context.Users.SingleAsync(u => u.Name == username);
 
-        if (guestUser == null)
+        if (user == null)
         {
-            throw new HubException("Error: No user ID!");
+            return new StandardJsonResponse { Success = false, Message = "Invalid credentials." };
         }
 
-        bool isInvalid = States.Exists(s => s.Name == username);
+        bool isValid = _authService.CheckValidity(password, user.Password);
 
-        if (isInvalid)
+        if (!isValid)
         {
-            await Clients.Caller.ReceiveMessage("sys", "Username already exists.", "server");
-            return;
+            return new StandardJsonResponse { Success = false, Message = "Invalid credentials." };
         }
 
-        guestUser.Name = username;
-        guestUser.authState = AuthState.User;
-        await Clients.Caller.LogIn(username);
-        await FetchUsers();
+        string token = Guid.NewGuid().ToString();
+
+        user.LoginToken = token;
+
+        await context.SaveChangesAsync();
+
+        User? uState = States.Find(u => u.Id == Context.ConnectionId);
+        if (uState == null)
+        {
+            return new StandardJsonResponse { Success = false, Message = "Unknown error occurred." };
+        }
+
+        uState.authState = AuthState.User;
+
+        var metadata = new Dictionary<string, string>
+        {
+            { "Token", token },
+            { "Username", username },
+            { "ConnectionId", Context.ConnectionId }
+        };
+
+        await PushClientListUpdate();
+
+        return new StandardJsonResponse { Success = true, Metadata = metadata };
+    }
+
+    public async Task<StandardJsonResponse> ReLogIn(string token)
+    {
+        using var context = new ApplicationDbContext();
+        try
+        {
+            var user = await context.Users.Where(u => u.LoginToken == token).SingleAsync();
+            if (user == null || user.LoginToken == null)
+            {
+                return new StandardJsonResponse { Success = false };
+            }
+
+            var metadata = new Dictionary<string, string>
+            {
+                { "Token", user.LoginToken },
+                { "Username", user.Name },
+                { "ConnectionId", Context.ConnectionId }
+            };
+
+            return new StandardJsonResponse { Success = true, Metadata = metadata };
+        }
+        catch (Exception)
+        {
+            return new StandardJsonResponse { Success = false, Message = "Unknown error occurred." };
+        }
     }
 
     public async Task<StandardJsonResponse> Register(RegisterRequestObject registerRequest)

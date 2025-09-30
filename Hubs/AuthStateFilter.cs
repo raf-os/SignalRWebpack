@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.SignalR;
+using SignalRWebpack.Database;
 
 namespace SignalRWebpack.Hubs;
 
@@ -8,6 +9,7 @@ public class AuthStateFilter : IHubFilter
         HubInvocationContext context,
         Func<HubInvocationContext, ValueTask<object?>> next)
     {
+        //using var dbContext = new ApplicationDbContext();
         AuthStateAttribute authFilter = (AuthStateAttribute)Attribute.GetCustomAttribute(context.HubMethod, typeof(AuthStateAttribute))!;
         if (authFilter != null)
         {
