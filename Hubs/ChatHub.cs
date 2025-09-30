@@ -164,7 +164,7 @@ public class ChatHub(IAuthService authService) : Hub<IChatClient>
 
         await context.SaveChangesAsync();
 
-        return new StandardJsonResponse { Success = true, Message = "User registered successfully!" };
+        return new StandardJsonResponse { Success = true };
     }
 
     public async Task FetchUsers()

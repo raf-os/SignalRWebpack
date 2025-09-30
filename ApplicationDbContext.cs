@@ -27,4 +27,8 @@ public class DbUser
 public class ApplicationDbContext : DbContext
 {
     public DbSet<DbUser> Users { get; set; }
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        optionsBuilder.UseSqlite("Data Source=users.db");
+    }
 }

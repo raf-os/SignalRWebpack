@@ -22,9 +22,7 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddDbContext<ApplicationDbContext>(
-    options => options.UseSqlite("Data Source=users.db")
-);
+builder.Services.AddDbContext<ApplicationDbContext>();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 
