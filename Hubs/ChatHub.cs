@@ -44,6 +44,16 @@ public class ChatHub(IAuthService authService) : Hub<IChatClient>
         return loggedUsers;
     }
 
+    private static User? GetUserState(string connectionId)
+    {
+        User? uState = States.Find(u => u.Id == connectionId);
+        if (uState == null)
+        {
+            return null;
+        }
+        return uState;
+    }
+
     private Task PushClientListUpdate()
     {
         var loggedUsers = GetLoggedUsers();
@@ -136,6 +146,17 @@ public class ChatHub(IAuthService authService) : Hub<IChatClient>
                 { "ConnectionId", Context.ConnectionId }
             };
 
+            var u = GetUserState(Context.ConnectionId);
+            if (u == null)
+            {
+                return new StandardJsonResponse { Success = false, Message = "Unknown error occurred." };
+            }
+
+            u.Name = user.Name;
+            u.authState = AuthState.User;
+
+            await PushClientListUpdate();
+
             return new StandardJsonResponse { Success = true, Metadata = metadata };
         }
         catch (Exception)
@@ -147,6 +168,7 @@ public class ChatHub(IAuthService authService) : Hub<IChatClient>
     public async Task<StandardJsonResponse> Register(RegisterRequestObject registerRequest)
     {
         using var context = new ApplicationDbContext();
+
         var lookupUsername = await context.Users.Where(u => u.Name == registerRequest.Username).ToListAsync();
         if (lookupUsername.Count != 0)
         {
