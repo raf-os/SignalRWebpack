@@ -114,6 +114,7 @@ public class ChatHub(IAuthService authService) : Hub<IChatClient>
             return new StandardJsonResponse { Success = false, Message = "Unknown error occurred." };
         }
 
+        uState.Name = username;
         uState.authState = AuthState.User;
 
         var metadata = new Dictionary<string, string>
@@ -187,6 +188,20 @@ public class ChatHub(IAuthService authService) : Hub<IChatClient>
         await context.SaveChangesAsync();
 
         return new StandardJsonResponse { Success = true };
+    }
+
+    public async Task LogOut()
+    {
+        var cId = Context.ConnectionId;
+        var uState = GetUserState(cId);
+
+        if (uState != null)
+        {
+            uState.Name = null;
+            uState.authState = AuthState.Guest;
+        }
+
+        await PushClientListUpdate();
     }
 
     public async Task FetchUsers()
