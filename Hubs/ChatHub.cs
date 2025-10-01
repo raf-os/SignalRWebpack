@@ -10,7 +10,9 @@ namespace SignalRWebpack.Hubs;
 public enum AuthState
 {
     Guest,
-    User
+    User,
+    Operator,
+    Admin
 }
 
 [AttributeUsage(AttributeTargets.Method)]
@@ -30,7 +32,7 @@ public class RegisterRequestObject
 public class ChatHub(IAuthService authService) : Hub<IChatClient>
 {
     private static readonly List<User> States = [];
-    private readonly IAuthService _authService = authService;
+    private readonly IAuthService _authService = authService;    
 
     public static AuthState GetState(string connectionId)
     {
@@ -80,26 +82,32 @@ public class ChatHub(IAuthService authService) : Hub<IChatClient>
     }
 
     [AuthState(AuthState.User)]
-    public async Task NewMessage(string username, string message, string type)
+    public async Task NewMessage(string message)
     {
-        await Clients.All.ReceiveMessage(username, message, type);
+        var sender = GetUserState(Context.ConnectionId);
+        if (sender == null || sender.Name == null)
+        {
+            return;
+        }
+        var chatMessage = new ChatMessage { Id = Guid.NewGuid().ToString(), Sender = sender.Name, Message = message, Type = "user" };
+        await Clients.All.ReceiveMessage(chatMessage);
     }
 
-    public async Task<StandardJsonResponse> LogIn(string username, string password)
+    public async Task<LoginMetadataResponse> LogIn(string username, string password)
     {
         using var context = new ApplicationDbContext();
-        DbUser? user = await context.Users.SingleAsync(u => u.Name == username);
+        DbUser? user = await context.Users.Where(u => u.Name == username).FirstOrDefaultAsync();
 
         if (user == null)
         {
-            return new StandardJsonResponse { Success = false, Message = "Invalid credentials." };
+            return new LoginMetadataResponse { Success = false, Message = "Invalid credentials." };
         }
 
         bool isValid = _authService.CheckValidity(password, user.Password);
 
         if (!isValid)
         {
-            return new StandardJsonResponse { Success = false, Message = "Invalid credentials." };
+            return new LoginMetadataResponse { Success = false, Message = "Invalid credentials." };
         }
 
         string token = Guid.NewGuid().ToString();
@@ -111,46 +119,48 @@ public class ChatHub(IAuthService authService) : Hub<IChatClient>
         User? uState = States.Find(u => u.Id == Context.ConnectionId);
         if (uState == null)
         {
-            return new StandardJsonResponse { Success = false, Message = "Unknown error occurred." };
+            return new LoginMetadataResponse { Success = false, Message = "Unknown error occurred." };
         }
 
         uState.Name = username;
         uState.authState = AuthState.User;
 
-        var metadata = new Dictionary<string, string>
+        var metadata = new LoginMetadata
         {
-            { "Token", token },
-            { "Username", username },
-            { "ConnectionId", Context.ConnectionId }
+            Token = token,
+            Username = user.Name,
+            ConnectionId = Context.ConnectionId,
+            Auth = user.Auth
         };
 
         await PushClientListUpdate();
 
-        return new StandardJsonResponse { Success = true, Metadata = metadata };
+        return new LoginMetadataResponse { Success = true, Metadata = metadata };
     }
 
-    public async Task<StandardJsonResponse> ReLogIn(string token)
+    public async Task<LoginMetadataResponse> ReLogIn(string token)
     {
         using var context = new ApplicationDbContext();
         try
         {
-            var user = await context.Users.Where(u => u.LoginToken == token).SingleAsync();
+            var user = await context.Users.Where(u => u.LoginToken == token).FirstOrDefaultAsync();
             if (user == null || user.LoginToken == null)
             {
-                return new StandardJsonResponse { Success = false };
+                return new LoginMetadataResponse { Success = false };
             }
 
-            var metadata = new Dictionary<string, string>
+            var metadata = new LoginMetadata
             {
-                { "Token", user.LoginToken },
-                { "Username", user.Name },
-                { "ConnectionId", Context.ConnectionId }
+                Token = token,
+                Username = user.Name,
+                ConnectionId = Context.ConnectionId,
+                Auth = user.Auth
             };
 
             var u = GetUserState(Context.ConnectionId);
             if (u == null)
             {
-                return new StandardJsonResponse { Success = false, Message = "Unknown error occurred." };
+                return new LoginMetadataResponse { Success = false, Message = "Unknown error occurred." };
             }
 
             u.Name = user.Name;
@@ -158,11 +168,11 @@ public class ChatHub(IAuthService authService) : Hub<IChatClient>
 
             await PushClientListUpdate();
 
-            return new StandardJsonResponse { Success = true, Metadata = metadata };
+            return new LoginMetadataResponse { Success = true, Metadata = metadata };
         }
         catch (Exception)
         {
-            return new StandardJsonResponse { Success = false, Message = "Unknown error occurred." };
+            return new LoginMetadataResponse { Success = false, Message = "Unknown error occurred." };
         }
     }
 

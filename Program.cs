@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.SignalR;
 using SignalRWebpack.Hubs;
 using SignalRWebpack.Database;
 using SignalRWebpack.Services;
-using Microsoft.EntityFrameworkCore;
+using SignalRWebpack.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSignalR()
@@ -32,5 +32,6 @@ app.UseRouting();
 app.UseCors();
 
 app.MapHub<ChatHub>("/hub");
+ApiEndpoints.Map(app);
 
 app.Run();
