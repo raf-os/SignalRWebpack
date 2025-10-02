@@ -24,6 +24,19 @@ public class DbUser
     }
 }
 
+public class DbUserDTO
+{
+    public string Name { get; set; }
+    public UserAuthState Auth { get; set; }
+
+    public DbUserDTO(string name, UserAuthState auth)
+    {
+        Name = name;
+        Auth = auth;
+    }
+    public DbUserDTO(DbUser dbUser) : this(dbUser.Name, dbUser.Auth) {}
+}
+
 public class ApplicationDbContext : DbContext
 {
     public DbSet<DbUser> Users { get; set; }
