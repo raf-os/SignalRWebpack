@@ -26,15 +26,17 @@ public class DbUser
 
 public class DbUserDTO
 {
+    public int Id { get; set; }
     public string Name { get; set; }
     public UserAuthState Auth { get; set; }
 
-    public DbUserDTO(string name, UserAuthState auth)
+    public DbUserDTO(int id, string name, UserAuthState auth)
     {
+        Id = id;
         Name = name;
         Auth = auth;
     }
-    public DbUserDTO(DbUser dbUser) : this(dbUser.Name, dbUser.Auth) {}
+    public DbUserDTO(DbUser dbUser) : this(dbUser.Id, dbUser.Name, dbUser.Auth) {}
 }
 
 public class ApplicationDbContext : DbContext
