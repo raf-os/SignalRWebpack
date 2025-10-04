@@ -12,7 +12,7 @@ public class UpdateUserDataRequest
 {
     public int UserId { get; set; }
     public string? UserName { get; set; }
-    public UserAuthState UserAuth { get; set; }
+    public int UserAuth { get; set; }
 }
 
 public class CheckHeaderResult
@@ -97,12 +97,12 @@ public static class ApiEndpoints
             return TypedResults.NotFound();
         }
 
-        if (userToUpdate.Auth < result.authState)
+        if (userToUpdate.Auth > result.authState)
         {
             return TypedResults.Unauthorized();
         }
 
-        userToUpdate.Auth = newData.UserAuth;
+        userToUpdate.Auth = (UserAuthState)newData.UserAuth;
         await context.SaveChangesAsync();
 
         return TypedResults.Ok();
